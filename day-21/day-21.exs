@@ -93,54 +93,63 @@ defmodule Day21 do
   end
 
   def parse_rule(line) do
-    case String.split(line, " => ") do
-      [rule, result] -> {canonicalize(parse_grid(rule)), parse_grid(result)}
-    end
+    line
+    |> String.split(" => ")
+    |> Enum.map(&parse_grid/1)
+    |> case do
+         [rule, result] -> {canonicalize(rule), result}
+       end
   end
 
-  def enhance(block, rules) do
-    {_rule, result} = rules |> List.keyfind(canonicalize(block), 0)
-    result
+  @doc "Expand the block into a list of subblocks after rule expansion."
+  def expand(block, rules) do
+    {rule, result} = rules |> List.keyfind(canonicalize(block), 0)
+    {
+      rule,
+      case result do
+        [
+          [_, _, _],
+          [_, _, _],
+          [_, _, _]
+        ] -> [
+          result
+        ]
+        [
+          [a1, a2, b1, b2],
+          [a3, a4, b3, b4],
+          [c1, c2, d1, d2],
+          [c3, c4, d3, d4]
+        ] -> [
+          [[a1, a2], [a3, a4]],
+          [[b1, b2], [b3, b4]],
+          [[c1, c2], [c3, c4]],
+          [[d1, d2], [d3, d4]]
+        ]
+      end
+    }
   end
 
   def count_num_on(block) do
     block
-    |> Enum.flat_map(fn line -> line end)
+    |> Enum.flat_map(fn row -> row end)
     |> Enum.count(fn
-      "#" -> true
-      "." -> false
-    end)
+         "#" -> true
+         "." -> false
+       end)
   end
 
   def count_at_depth(0, block, _), do: count_num_on(block)
   def count_at_depth(depth, block, rules) do
-    eblock = enhance(block, rules)
-    case eblock do
-      [[_, _, _], [_, _, _], [_, _, _]] ->
-        count_at_depth(depth-1, eblock, rules)
-      [
-        [a1, a2, b1, b2],
-        [a3, a4, b3, b4],
-        [c1, c2, d1, d2],
-        [c3, c4, d3, d4]
-      ] ->
-        Enum.sum([
-          count_at_depth(depth-1, [[a1, a2], [a3, a4]], rules),
-          count_at_depth(depth-1, [[b1, b2], [b3, b4]], rules),
-          count_at_depth(depth-1, [[c1, c2], [c3, c4]], rules),
-          count_at_depth(depth-1, [[d1, d2], [d3, d4]], rules),
-        ])
-    end
+    {rule, blocks} = expand(block, rules)
+    IO.puts("Expanding rule " <> inspect(rule))
+
+    blocks
+    |> Enum.flat_map(fn block -> count_at_depth(depth-1, block, rules) end)
   end
+
+  def start, do: parse_grid(".#./..#/###")
+  def rules, do: File.read!("input.txt") |> String.split("\n", trim: true) |> Enum.map(&parse_rule/1)
+  def solution, do: count_at_depth(5, start(), rules())
 end
 
-start = Day21.parse_grid(".#./..#/###")
-rules = IO.stream(:stdio, :line) |> Enum.map(&Day21.parse_rule/1)
-
-#IO.puts inspect(start)
-#IO.puts inspect(rules)
-
-IO.puts Day21.count_at_depth(5, start, rules)
-
-
-
+IO.puts Day21.solution
